@@ -1,155 +1,47 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Strong CSP: no inline scripts, no remote scripts, no plugins. -->
-  <meta http-equiv="Content-Security-Policy"
-        content="
-          default-src 'none';
-          script-src 'self';
-          connect-src https: http:;
-          img-src 'self' data:;
-          style-src 'self';
-          base-uri 'none';
-          form-action 'none';
-          frame-ancestors 'none';
-        ">
-
-  <title>URL Viewer (Safe Text)</title>
-
+  <meta charset="UTF-8">
+  <title>Safe Viewer</title>
   <style>
     body {
       margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #f6f7f9;
-      color: #111;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      background: #f4f4f4;
     }
-    .card {
-      width: min(900px, 92vw);
+    .box {
       background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 14px;
-      padding: 18px 18px 14px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-    }
-    .meta {
-      font-size: 14px;
-      color: #555;
-      margin-bottom: 10px;
-      word-break: break-all;
-    }
-    pre {
-      margin: 0;
-      padding: 14px;
-      background: #0b1020;
-      color: #e9edf5;
-      border-radius: 12px;
-      overflow: auto;
-      max-height: 70vh;
-      white-space: pre-wrap;    /* wrap long lines */
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 80%;
       word-break: break-word;
-      line-height: 1.35;
-    }
-    .error {
-      background: #fff5f5;
-      border: 1px solid #fed7d7;
-      color: #9b2c2c;
-      padding: 12px;
-      border-radius: 12px;
-      white-space: pre-wrap;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="meta" id="meta">Loading…</div>
-    <pre id="output" aria-live="polite"></pre>
-  </div>
 
-  <!-- Put JS in a separate file in production to satisfy script-src 'self'.
-       For a single-file demo, you can either:
-       1) remove CSP script-src 'self' and allow 'unsafe-inline' (not recommended), OR
-       2) save this JS as viewer.js and reference it with <script src="viewer.js"></script>.
-       Below is the JS logic shown inline for convenience.
-  -->
+  <div class="box" id="output"></div>
+
   <script>
-    (function () {
-      const metaEl = document.getElementById("meta");
-      const outEl  = document.getElementById("output");
+    function escapeHTML(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
 
-      function showError(msg) {
-        outEl.className = "error";
-        outEl.textContent = msg; // SAFE: no HTML injection
-      }
+    const params = new URLSearchParams(window.location.search);
+    const content = params.get("content") || "";
 
-      const params = new URLSearchParams(location.search);
-      const rawUrl = params.get("url");
-
-      if (!rawUrl) {
-        metaEl.textContent = "No url parameter provided.";
-        showError("Usage: ?url=https://example.com/path\n\nThis viewer renders fetched content as plain text to avoid XSS.");
-        return;
-      }
-
-      let target;
-      try {
-        // Support relative URLs by resolving against current origin
-        target = new URL(rawUrl, location.href);
-      } catch {
-        metaEl.textContent = "Invalid URL.";
-        showError("The provided url parameter is not a valid URL.");
-        return;
-      }
-
-      // Only allow http/https to reduce risk (blocks javascript:, data:, file:, etc.)
-      if (target.protocol !== "http:" && target.protocol !== "https:") {
-        metaEl.textContent = "Blocked URL scheme.";
-        showError("Only http and https URLs are allowed.");
-        return;
-      }
-
-      // Optional: prevent fetching localhost / private networks (SSRF-like concerns in some setups)
-      // Uncomment if you want stricter behavior in shared environments.
-      // const host = target.hostname.toLowerCase();
-      // if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".local")) {
-      //   metaEl.textContent = "Blocked host.";
-      //   showError("Localhost/local domains are not allowed.");
-      //   return;
-      // }
-
-      metaEl.textContent = `Fetching: ${target.href}`;
-
-      fetch(target.href, {
-        method: "GET",
-        mode: "cors",          // will fail if the target doesn't allow CORS
-        credentials: "omit",   // don't send cookies
-        redirect: "follow",
-        referrerPolicy: "no-referrer"
-      })
-        .then(async (res) => {
-          const ct = res.headers.get("content-type") || "";
-          const text = await res.text();
-
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status} ${res.statusText}\n\n${text.slice(0, 2000)}`);
-          }
-
-          // SAFE: render as text only; never use innerHTML with untrusted content.
-          outEl.textContent =
-            `Content-Type: ${ct}\n` +
-            `Status: ${res.status}\n\n` +
-            text;
-        })
-        .catch((err) => {
-          metaEl.textContent = "Fetch failed.";
-          showError(String(err && err.message ? err.message : err));
-        });
-    })();
+    document.getElementById("output").innerHTML = escapeHTML(content);
   </script>
+
 </body>
 </html>
